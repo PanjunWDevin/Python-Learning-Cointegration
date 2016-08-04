@@ -26,12 +26,14 @@ stock1_prices = stock_prices.loc[0:509,'601800']
 stock2_prices = stock_prices.loc[0:509,'601818']
 
 #per_change of stock1 and stock2
-p_change_1 = stock_prices.loc[0:510,'601800'].iloc[::-1].pct_change()
-p_change_2 = stock_prices.loc[0:510,'601818'].iloc[::-1].pct_change()
+p_change_1 = stock_prices.loc[0:513,'601800'].iloc[::-1].pct_change()
+p_change_2 = stock_prices.loc[0:513,'601818'].iloc[::-1].pct_change()
 
 #get 'sz50' board Index historic data 'sz50'
 index = ts.get_hist_data('sz50',start='2013-01-01',end = '2016-07-30')
 index_watch = index['p_change']
+
+index_test = index['close'].loc['2016-06-30':'2014-07-02']
 
 index_p = index['close'].loc['2016-07-30':'2014-07-02']
 #print index_p.size
@@ -47,7 +49,7 @@ def cal_z_score():
 
     #we use 100 days' price data to calculate the z_score
     #initialize the prices
-    prices_series = coff_regression * stock_prices['601800'] - stock_prices['601818']
+    prices_series = stock_prices['601818'] - coff_regression * stock_prices['601800']
 
     #get the z_score_s
     n = m
@@ -85,20 +87,20 @@ def portfolio_positions(z_scores,portfolios,stock1_position,stock2_position,cash
         # SZ50 continouely drop for three days cash out the position
         # if the holding stock declines over 2% in subsequent 3 days, cash out all positions
 
-        if (index_watch[pindex - 1] < -5) or (p_change_1[pindex-1]< -1) or (p_change_2[pindex-1]< -1):
+        if  (p_change_1[pindex-1]< 0 and p_change_1[pindex]<0 and p_change_1[pindex+1]<0) or (p_change_2[pindex-1]< 0 and p_change_2[pindex]<0 and p_change_2[pindex+1]<0):
             portfolios[count] = cash + stock1_position * stock1_prices[pindex - 1] + stock2_position * stock2_prices[pindex - 1]  # update portfolio value
             stock1_position = 0 #sell all positions in stock 1
             stock2_position = 0 #sell all positions in stock 2
             cash = portfolios[count] #cash out all the positions thus now cash holding equals to the portfolio
 
-        elif (z_scores[count - 1] > 1): # full position in stock2
+        if (z_scores[count - 1] < -1): # full position in stock2
             stock2_added = int((stock1_position*stock1_prices[pindex-1]+cash)/stock2_prices[pindex-1]) # sell all stock1 position and buy in stock2
             stock2_position = stock2_position + stock2_added #update stock2 position
             cash = stock1_position*stock1_prices[pindex]+cash - stock2_added * stock2_prices[pindex - 1] #calculate the residual cash
             stock1_position = 0 #update stock1 position
             portfolios[count] = cash + stock1_position * stock1_prices[pindex-1] + stock2_position * stock2_prices[pindex -1] #update portfolio value
 
-        elif (z_scores[count - 1] < -1): # full position in stock1
+        elif (z_scores[count - 1] > 1): # full position in stock1
             stock1_added = int((stock2_position * stock2_prices[pindex - 1] + cash) / stock1_prices[pindex - 1]) # sell all stock2 position and buy in stock1
             stock1_position = stock1_position + stock1_added #update stock1 position
             cash = stock2_position * stock2_prices[pindex-1] + cash - stock1_added * stock1_prices[pindex - 1] # calculate the residual cash
@@ -129,14 +131,22 @@ date_range = stock_prices.loc[0:m,'date']
 #print date_range
 
 portfolio_output = pd.Series(portfolio_values[::-1],index=date_range)
-portfolio_output=portfolio_output.iloc[::-1]
+portfolio_output= portfolio_output.iloc[::-1]
+#index_benchmark = index.loc['2016-06-30':'2014-07-01','close'].iloc[::-1]
+#index_benchmark = 100*(index_benchmark/index_benchmark[0])
 portfolio_output = 100*(portfolio_output/portfolio_output[0])
-portfolio_output.plot()
+
+#index_benchmark.plot(color = 'r')
+portfolio_output.plot(color = 'b')
 plt.show()
+plt.xlabel('date')
+plt.ylabel('Performance')
 
 #calculate backwardation of the portfolio
 backward = portfolio_output.pct_change()*100
-
+print type(backward)
+backward.plot(color = 'r')
+plt.show()
 #output the maximum backwardation
 print backward.max() #this portfolio's maximum backwardation is 10.14%
 
