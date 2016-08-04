@@ -30,13 +30,9 @@ p_change_1 = stock_prices.loc[0:513,'601800'].iloc[::-1].pct_change()
 p_change_2 = stock_prices.loc[0:513,'601818'].iloc[::-1].pct_change()
 
 #get 'sz50' board Index historic data 'sz50'
-index = ts.get_hist_data('sz50',start='2013-01-01',end = '2016-07-30')
+index = ts.get_hist_data('sh',start='2013-01-01',end = '2016-07-30')
 index_watch = index['p_change']
 
-index_test = index['close'].loc['2016-06-30':'2014-07-02']
-
-index_p = index['close'].loc['2016-07-30':'2014-07-02']
-#print index_p.size
 
 #get signals for the positions changes
 def cal_z_score():
@@ -83,11 +79,10 @@ def portfolio_positions(z_scores,portfolios,stock1_position,stock2_position,cash
     pindex = m
     for count in range(1,m+1,1):
         # judege whether the overall market is experiencing a downtrend
-        # SZ50 index drops 5% over a day, cash out all the positions
-        # SZ50 continouely drop for three days cash out the position
+        # SH50 index drops 3% over a day, cash out all the positions
         # if the holding stock declines over 2% in subsequent 3 days, cash out all positions
 
-        if  (p_change_1[pindex-1]< 0 and p_change_1[pindex]<0 and p_change_1[pindex+1]<0) or (p_change_2[pindex-1]< 0 and p_change_2[pindex]<0 and p_change_2[pindex+1]<0):
+        if  (index_watch[pindex-1]<-3) or (p_change_1[pindex-1]< 0 and p_change_1[pindex]<0 and p_change_1[pindex+1]<0) or (p_change_2[pindex-1]< 0 and p_change_2[pindex]<0 and p_change_2[pindex+1]<0):
             portfolios[count] = cash + stock1_position * stock1_prices[pindex - 1] + stock2_position * stock2_prices[pindex - 1]  # update portfolio value
             stock1_position = 0 #sell all positions in stock 1
             stock2_position = 0 #sell all positions in stock 2
@@ -132,11 +127,11 @@ date_range = stock_prices.loc[0:m,'date']
 
 portfolio_output = pd.Series(portfolio_values[::-1],index=date_range)
 portfolio_output= portfolio_output.iloc[::-1]
-#index_benchmark = index.loc['2016-06-30':'2014-07-01','close'].iloc[::-1]
-#index_benchmark = 100*(index_benchmark/index_benchmark[0])
+index_benchmark = index.loc['2016-07-29':'2014-07-01','close'].iloc[::-1]
+index_benchmark = 100*(index_benchmark/index_benchmark[0])
 portfolio_output = 100*(portfolio_output/portfolio_output[0])
 
-#index_benchmark.plot(color = 'r')
+index_benchmark.plot(color = 'r')
 portfolio_output.plot(color = 'b')
 plt.show()
 plt.xlabel('date')
