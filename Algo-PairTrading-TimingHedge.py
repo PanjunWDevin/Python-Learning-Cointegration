@@ -22,12 +22,12 @@ stock_prices = pd.read_csv('/Users/panjunwang/PycharmProjects/PythonWork/PairTra
 #print stock_prices.loc[509,'date']
 #stock price ranges from 2016-07-30 to 2014-07-02, amounting to 510 numbers
 #stock_prices['601800'] = X,  stocks['601818'] = Y
-stock1_prices = stock_prices.loc[0:509,'601800']
-stock2_prices = stock_prices.loc[0:509,'601818']
+stock1_prices = stock_prices.loc[0:509,stock_1]
+stock2_prices = stock_prices.loc[0:509,stock_2]
 
 #per_change of stock1 and stock2
-p_change_1 = stock_prices.loc[0:513,'601800'].iloc[::-1].pct_change()
-p_change_2 = stock_prices.loc[0:513,'601818'].iloc[::-1].pct_change()
+p_change_1 = stock_prices.loc[0:513,stock_1].iloc[::-1].pct_change()
+p_change_2 = stock_prices.loc[0:513,stock_2].iloc[::-1].pct_change()
 
 #get 'sz50' board Index historic data 'sz50'
 index = ts.get_hist_data('sh',start='2013-01-01',end = '2016-07-30')
@@ -45,7 +45,7 @@ def cal_z_score():
 
     #we use 100 days' price data to calculate the z_score
     #initialize the prices
-    prices_series = stock_prices['601818'] - coff_regression * stock_prices['601800']
+    prices_series = stock_prices[stock_2] - coff_regression * stock_prices[stock_1]
 
     #get the z_score_s
     n = m
@@ -66,8 +66,8 @@ z_scores, m = cal_z_score()
 #portfolio = stock1_positions * stock1_price + stock2_positions * stock2_price + residual
 portfolios = np.zeros(m+1) #initial point is right before 2014-07-01
 #price on 2014-07-01 corresponding to row m and column 'stock code'
-stock1_prices[m] = stock_prices.loc[m,'601800']
-stock2_prices[m] = stock_prices.loc[m,'601818']
+stock1_prices[m] = stock_prices.loc[m,stock_1]
+stock2_prices[m] = stock_prices.loc[m,stock_2]
 #intial portfolio value set at CNY100,000, beginning at 2014-07-01 with p% on stock_1, q% on stock_2
 portfolios[0] = 100000
 stock1_position = int(p*portfolios[0]/stock1_prices[m]) #initial position in stock1
@@ -75,20 +75,26 @@ stock2_position = int(q*portfolios[0]/stock2_prices[m]) #initial position in sto
 cash = portfolios[0] - stock1_position*stock1_prices[m] - stock2_position*stock2_prices[m]
 
 # input is the signals, calculate the positions changes, assuming no transaction fees
+#leave strategy execution as in loop form to simulate real trading process on a daily basis
 def portfolio_positions(z_scores,portfolios,stock1_position,stock2_position,cash):
     pindex = m
     for count in range(1,m+1,1):
         # judege whether the overall market is experiencing a downtrend
         # SH50 index drops 3% over a day, cash out all the positions
         # if the holding stock declines over 2% in subsequent 3 days, cash out all positions
+        if (index_watch[pindex-1]<-3) or (index_watch[pindex]<-3 and index_watch[pindex-1]<0) or (index_watch[pindex+1]<0 and index_watch[pindex]<0 and index_watch[pindex-1]<0):
+            portfolios[count] = cash + stock1_position * stock1_prices[pindex - 1] + stock2_position * stock2_prices[pindex - 1]  # update portfolio value
+            stock1_position = 0  # sell all positions in stock 1
+            stock2_position = 0  # sell all positions in stock 2
+            cash = portfolios[count]  # cash out all the positions thus now cash holding equals to the portfolio
 
-        if  (index_watch[pindex-1]<-3) or (p_change_1[pindex-1]< 0 and p_change_1[pindex]<0 and p_change_1[pindex+1]<0) or (p_change_2[pindex-1]< 0 and p_change_2[pindex]<0 and p_change_2[pindex+1]<0):
+        elif  (p_change_1[pindex-1]<-8) or (p_change_2[pindex-1] < -8) or (p_change_1[pindex-1]< 0 and p_change_1[pindex]<0 and p_change_1[pindex+1]<0) or (p_change_2[pindex-1]< 0 and p_change_2[pindex]<0 and p_change_2[pindex+1]<0):
             portfolios[count] = cash + stock1_position * stock1_prices[pindex - 1] + stock2_position * stock2_prices[pindex - 1]  # update portfolio value
             stock1_position = 0 #sell all positions in stock 1
             stock2_position = 0 #sell all positions in stock 2
             cash = portfolios[count] #cash out all the positions thus now cash holding equals to the portfolio
 
-        if (z_scores[count - 1] < -1): # full position in stock2
+        elif (z_scores[count - 1] < -1): # full position in stock2
             stock2_added = int((stock1_position*stock1_prices[pindex-1]+cash)/stock2_prices[pindex-1]) # sell all stock1 position and buy in stock2
             stock2_position = stock2_position + stock2_added #update stock2 position
             cash = stock1_position*stock1_prices[pindex]+cash - stock2_added * stock2_prices[pindex - 1] #calculate the residual cash
@@ -127,23 +133,57 @@ date_range = stock_prices.loc[0:m,'date']
 
 portfolio_output = pd.Series(portfolio_values[::-1],index=date_range)
 portfolio_output= portfolio_output.iloc[::-1]
+#stock1_prices = stock1_prices.iloc[::-1]
+#stock2_prices = stock2_prices.iloc[::-1]
 index_benchmark = index.loc['2016-07-29':'2014-07-01','close'].iloc[::-1]
 index_benchmark = 100*(index_benchmark/index_benchmark[0])
 portfolio_output = 100*(portfolio_output/portfolio_output[0])
-
-index_benchmark.plot(color = 'r')
-portfolio_output.plot(color = 'b')
+#stock1_prices_op = 100*(stock1_prices/stock1_prices[0])
+#stock2_prices_op = 100*(stock2_prices/stock2_prices[0])
+#plot
+#print portfolio_output
+index_benchmark.plot(color='r')
+portfolio_output.plot(color ='b')
+#stock1_prices_op.plot(color = 'g')
+#stock2_prices_op.plot(color = 'y')
 plt.show()
 plt.xlabel('date')
 plt.ylabel('Performance')
 
+#calculate portfolio indicators#
+#portfolio annualized return
+annual_return = np.exp((252.0/portfolio_output.size) * np.log(portfolio_output[-1]/portfolio_output[0]) ) -1
+print "Portfolio annualized return is :", annual_return
+
+#Sharpe Ratio
+#[100.0 * a1 / a2 - 100 for a1, a2 in zip(a[1:], a)]
+pff = portfolio_output.values
+pff_log = np.log(pff)
+returns_p = np.diff(pff_log)
+std = np.std(returns_p)*np.sqrt(252) #annualised standard deviation
+print std
+rf = 0.05
+print "Portfolio sharpe ratio is ", (annual_return - rf)/std
+
+#maximum drawdown is the drawdown from the peak till next peak reached.
+peak = portfolio_output[0]
+drawdown = np.zeros(portfolio_output.size)
+i = 0
+for item in portfolio_output:
+    if item > peak:
+        peak = item
+    else:
+        drawdown[i] = 100*((item - peak)/peak)
+        i +=1
+print 'maximum drawdown is: ',drawdown.min()
+
 #calculate backwardation of the portfolio
-backward = portfolio_output.pct_change()*100
-print type(backward)
-backward.plot(color = 'r')
-plt.show()
+#drawdown = portfolio_output.pct_change()*100
+#print type(backward)
+#drawdown.plot(color = 'r')
+#plt.show()
 #output the maximum backwardation
-print backward.max() #this portfolio's maximum backwardation is 10.14%
+#print drawdown.max() #this portfolio's maximum backwardation is 10.14%
 
 
 #benchmark1.plot()
